@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LUT Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a precise colour-suite tool, quiet and exact
+   IDEA: a grading panel — viewer on the right, node-like steps on the left
+   PICTURE: the live before/after viewer with a draggable split
+   COLOUR and TYPE: graphite suite grey, ivory text, one warm amber-peach accent from skin tones; Archivo
+   LAYOUT: two columns (controls 380px, viewer fills); stacks under 900px */
+:root{color-scheme:light dark;
+--bg:light-dark(#ecebe7,#16171a);--panel:light-dark(#ffffff,#1f2024);--line:light-dark(#d6d4ce,#2e3036);
+--ink:light-dark(#1b1c1f,#ecebe6);--mute:light-dark(#5f6066,#9a9ba2);--acc:light-dark(#b4532a,#f0a27a);--accink:light-dark(#fff,#1b1006);--well:light-dark(#e2e0da,#111214)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Archivo,system-ui,sans-serif;overflow-x:clip}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px max(2vw,16px);border-bottom:1px solid var(--line)}
+h1{font-size:22px;line-height:1.1;margin:0;font-weight:700}
+header p{margin:0;color:var(--mute);font-size:14px;flex:1 1 260px}
+.app{display:grid;grid-template-columns:380px minmax(0,1fr);min-height:calc(100vh - 60px)}
+aside{border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto;max-height:calc(100vh - 60px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:600;display:flex;gap:8px;align-items:center}
+.n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--acc);color:var(--accink);font-size:12px;font-weight:700}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--well);padding:4px;border-radius:9px}
+.tabs button{border:0;background:none;color:var(--mute);font:600 13px Archivo,sans-serif;padding:10px 4px;border-radius:6px;cursor:pointer;min-height:40px}
+.tabs button[aria-pressed=true]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px #0003}
+.hint{color:var(--mute);font-size:13px;margin:8px 0 0}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+select,input[type=text]{width:100%;font:16px Archivo,sans-serif;padding:9px 10px;border-radius:7px;border:1px solid var(--line);background:var(--well);color:var(--ink);min-height:44px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1.5px dashed var(--line);border-radius:9px;padding:14px;text-align:center;cursor:pointer;min-height:86px;color:var(--mute);font-size:13px;position:relative}
+.drop:hover,.drop.over{border-color:var(--acc);color:var(--ink)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop b{color:var(--ink);font-weight:600}
+.thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.thumbs div{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;background:var(--well)}
+.thumbs img{width:100%;height:100%;object-fit:cover}
+.thumbs button{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;background:#000a;color:#fff;cursor:pointer;font-size:13px;line-height:1}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:8px;align-items:center}
+input[type=range]{width:100%;accent-color:var(--acc);height:28px}
+.val{font-variant-numeric:tabular-nums;text-align:right;font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:8px;padding:11px 16px;font:600 15px Archivo,sans-serif;cursor:pointer;min-height:44px;background:var(--acc);color:var(--accink)}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,.tabs button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink);margin-top:10px}
+.check input{width:18px;height:18px;accent-color:var(--acc)}
+main{padding:16px;display:flex;flex-direction:column;gap:14px}
+.viewer{position:relative;background:var(--well);border-radius:10px;min-height:min(62vh,640px);display:grid;place-items:center;overflow:hidden;user-select:none;touch-action:none}
+.viewer canvas{max-width:100%;max-height:min(62vh,640px);display:block}
+.split{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 0 1px #0006;pointer-events:none}
+.split::after{content:"";position:absolute;top:50%;left:-13px;width:28px;height:28px;margin-top:-14px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0008}
+.tag{position:absolute;top:10px;padding:3px 8px;border-radius:5px;background:#000b;color:#fff;font-size:12px}
+.empty{color:var(--mute);text-align:center;padding:30px;max-width:420px}
+.empty strong{display:block;color:var(--ink);font-size:20px;margin-bottom:6px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;background:var(--well);border-radius:8px;padding:3px}
+.seg button{border:0;background:none;color:var(--mute);font:600 13px Archivo,sans-serif;padding:8px 12px;border-radius:6px;cursor:pointer;min-height:38px}
+.seg button[aria-pressed=true]{background:var(--panel);color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat span{display:block;font-size:12px;color:var(--mute)}
+.stat b{font-size:20px;font-variant-numeric:tabular-nums;font-weight:600}
+.stat i{font-style:normal;font-size:12px;color:var(--mute);margin-left:6px}
+.fig{position:relative;height:120px}.fig svg{position:absolute;inset:0;width:100%;height:100%}
+#status{font-size:13px;color:var(--mute);min-height:20px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+summary{cursor:pointer;font-weight:600}
+details ol{padding-left:20px;margin:10px 0 0}details li{margin:4px 0}
+@media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}aside{border-right:0;max-height:none;order:2}main{order:1}}
+@media(prefers-reduced-motion:no-preference){.btn,.tabs button{transition:background .15s}}
+</style>
+</head>
+<body>
+<header>
+  <h1>LUT Generator</h1>
+  <p>Footage frame ekai, ona grade eke photos tikai dammama analyse karala .cube LUT ekak hadanawa.</p>
+  <button class="btn ghost" id="install" hidden>Desktop app ekak widihata install karanna</button>
+</header>
+<div class="app">
+<aside>
+  <div class="tabs" role="group" aria-label="Mode">
+    <button data-mode="style" aria-pressed="true">Style match</button>
+    <button data-mode="exact" aria-pressed="false">Same frame</button>
+    <button data-mode="pg" aria-pressed="false">PowerGrade</button>
+  </div>
+  <p class="hint" id="modeHint"></p>
+
+  <div class="card">
+    <h2><span class="n">1</span><span id="srcTitle">Footage frame</span></h2>
+    <div class="drop" id="srcDrop"><b>Image eka thoranna hari methanata drag karanna</b>PNG / JPG (Resolve: Grab Still → Export)<input type="file" id="srcFile" accept="image/*"></div>
+    <div class="thumbs" id="srcThumb"></div>
+    <div id="spaceBox">
+      <label for="space">Input colour space</label>
+      <select id="space">
+        <option value="rec709">Rec.709 (Gamma 2.4)</option>
+        <option value="slog3">Sony S-Log3 / S-Gamut3.Cine</option>
+        <option value="cineon">Rec.709 gamut / Cineon Film Log</option>
+      </select>
+      <div id="expBox" hidden>
+        <label for="exp">Exposure compensation (stops) — +1 over shoot kala nam −1</label>
+        <div class="row"><input type="range" id="exp" min="-3" max="3" step="0.1" value="0"><span class="val" id="expV">0.0</span></div>
+      </div>
+    </div>
+    <label class="check" id="pgExactBox" hidden><input type="checkbox" id="pgExact"> Target eka me frame ekema grade ekak (exact)</label>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span><span id="refTitle">Reference grade photos</span></h2>
+    <div class="drop" id="refDrop"><b id="refDropT">Photos thoranna (kihipayak denna puluwan)</b>Ona tone eka thiyena graded photos<input type="file" id="refFile" accept="image/*" multiple></div>
+    <div class="thumbs" id="refThumbs"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span>Fine tune</h2>
+    <div id="sliders"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span>Export</h2>
+    <label for="lsize">LUT size</label>
+    <select id="lsize"><option value="33">33 point — Premiere, FCP, camera, Resolve</option><option value="65">65 point — Resolve (wadi quality)</option></select>
+    <label for="lname">File name</label>
+    <input type="text" id="lname" value="My_Grade_LUT">
+    <div class="bar" style="margin-top:12px">
+      <button class="btn" id="dl" disabled>Download .cube (.zip)</button>
+      <button class="btn ghost" id="copy" disabled>Copy .cube text</button>
+    </div>
+    <p class="hint" id="dlMsg">Zip eka extract karala .cube file eka gannna.</p>
+  </div>
+</aside>
+
+<main>
+  <div class="bar">
+    <div class="seg" role="group" aria-label="View">
+      <button data-view="split" aria-pressed="true">Split</button>
+      <button data-view="before" aria-pressed="false">Before</button>
+      <button data-view="after" aria-pressed="false">After</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div class="viewer" id="viewer">
+    <div class="empty" id="empty"><strong>Footage frame ekak dammama preview eka methana pennanawa</strong>Image eka mada thiyena line eka drag karala before / after balanna puluwan.</div>
+    <canvas id="cv" hidden></canvas>
+    <div class="split" id="split" hidden></div>
+    <span class="tag" id="tagL" hidden style="left:10px">Before</span>
+    <span class="tag" id="tagR" hidden style="right:10px">After</span>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="card"><h2>Tone curve (input brightness → output)</h2><div class="fig"><svg id="curve"></svg></div></div>
+  <details>
+    <summary>Resolve eke use karana widiha</summary>
+    <ol>
+      <li><b>Rec.709 footage:</b> Color page eke node ekak hadala, right click → LUT → oyage .cube eka danna.</li>
+      <li><b>S-Log3 direct:</b> CST nathuwa, clip eke first node eke correction karala, LUT eka anith node ekata danna.</li>
+      <li><b>CST → Rec.709 / Cineon Film Log:</b> CST eke Tone Mapping eka None karanna. Input space eka "Cineon Film Log" thoranna.</li>
+      <li><b>LUT folder:</b> Project Settings → Color Management → Open LUT Folder. Ekata .cube eka copy karala Update Lists karanna.</li>
+      <li><b>Strength:</b> LUT node eke Key → Key Output Gain eka adu karala look eka adu karanna puluwan.</li>
+    </ol>
+  </details>
+  <details>
+    <summary>PowerGrade mode eka wada karana widiha</summary>
+    <ol>
+      <li>Resolve eke oyage PowerGrade eka clip ekakata apply karanna.</li>
+      <li>Viewer eke right click → Grab Still. Gallery eke still eka right click → Export → PNG / JPG.</li>
+      <li>E still eka step 1 ta, ona tone eke photo eka step 2 ta danna.</li>
+      <li>Hambena LUT eka PowerGrade eke <b>last node</b> eka widihata danna (node ekak add karala → LUT).</li>
+      <li>Still eka right click → "Save as PowerGrade" / aluth still ekak grab karala PowerGrades album ekata danna. Ethakota PowerGrade eka target tone ekata change wela thiyenawa.</li>
+    </ol>
+    <p class="hint">.drx file eke node values (lift / gamma / gain) kelinma edit karanna Resolve eken public format ekak denne na. E nisa me app eka PowerGrade eka match karana correction LUT ekak hadanawa.</p>
+  </details>
+  <p class="hint">Style match eken different photos dekaka "tone eka" match karanawa (brightness distribution, colour zones, hue wise saturation). 100% exact match ekak ona nam, same frame eka grade karapu version eka "Same frame" mode ekata danna.</p>
+</main>
+</div>
+<script>
+// ===== LUT Generator core (no DOM) =====
+const Core = (() => {
+  const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+  const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+  // ---- transfer functions ----
+  const s2l = v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  const l2s = v => v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+  const S2L = new Float32Array(256); for (let i = 0; i < 256; i++) S2L[i] = s2l(i / 255);
+
+  function slog3ToLin(x) {
+    const cv = x * 1023;
+    return cv >= 171.2102946929 ? Math.pow(10, (cv - 420) / 261.5) * 0.19 - 0.01
+      : (cv - 95) * 0.01125 / (171.2102946929 - 95);
+  }
+  const COFF = Math.pow(10, (95 - 685) / 300);
+  const cineonToLin = x => (Math.pow(10, (x * 1023 - 685) / 300) - COFF) / (1 - COFF);
+  // S-Gamut3.Cine -> Rec709 linear
+  const MSG = [[1.6266885, -0.5400526, -0.0867950], [-0.1785196, 1.4179737, -0.2394309], [-0.0444468, -0.1959670, 1.2406538]];
+
+  // neutral filmic display curve for log sources (mid grey 0.18 -> ~0.43)
+  const C = 0.62, sig = s => 1 / (1 + Math.exp(-C * s));
+  const LO = sig(-9), HI = sig(6.5);
+  const GAM = Math.log(0.43) / Math.log((sig(0) - LO) / (HI - LO));
+  const tone = l => { const s = Math.log2(Math.max(l, 1e-6) / 0.18); return Math.pow(clamp((sig(s) - LO) / (HI - LO), 0, 1), GAM); };
+
+  // raw input code value -> neutral display rgb (sRGB-ish encoded)
+  function decode(r, g, b, space, exp, out) {
+    if (space === 'rec709') { out[0] = r; out[1] = g; out[2] = b; return out; }
+    let R, G, B; const k = Math.pow(2, exp || 0);
+    if (space === 'slog3') {
+      const lr = slog3ToLin(r), lg = slog3ToLin(g), lb = slog3ToLin(b);
+      R = MSG[0][0] * lr + MSG[0][1] * lg + MSG[0][2] * lb;
+      G = MSG[1][0] * lr + MSG[1][1] * lg + MSG[1][2] * lb;
+      B = MSG[2][0] * lr + MSG[2][1] * lg + MSG[2][2] * lb;
+    } else { R = cineonToLin(r); G = cineonToLin(g); B = cineonToLin(b); }
+    R *= k; G *= k; B *= k;
+    const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;   // mild gamut compression
+    R = Math.max(Y + (R - Y) * 0.92, 0); G = Math.max(Y + (G - Y) * 0.92, 0); B = Math.max(Y + (B - Y) * 0.92, 0);
+    out[0] = tone(R); out[1] = tone(G); out[2] = tone(B); return out;
+  }
+
+  // ---- OKLab ----
+  function toLab(r, g, b, o) {
+    r = s2l(clamp(r, 0, 1)); g = s2l(clamp(g, 0, 1)); b = s2l(clamp(b, 0, 1));
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    o[0] = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+    o[1] = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+    o[2] = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s; return o;
+  }
+  function labToLinRGB(L, a, b, o) {
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+    o[0] = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+    o[1] = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+    o[2] = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s; return o;
+  }
+  // back to display, compressing chroma until in gamut
+  function fromLab(L, a, b, o) {
+    L = clamp(L, 0, 1);
+    labToLinRGB(L, a, b, o);
+    if (Math.min(o[0], o[1], o[2]) < -1e-4 || Math.max(o[0], o[1], o[2]) > 1.0001) {
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 12; i++) {
+        const k = (lo + hi) / 2; labToLinRGB(L, a * k, b * k, o);
+        if (Math.min(o[0], o[1], o[2]) < -1e-4 || Math.max(o[0], o[1], o[2]) > 1.0001) hi = k; else lo = k;
+      }
+      labToLinRGB(L, a * lo, b * lo, o);
+    }
+    o[0] = l2s(clamp(o[0], 0, 1)); o[1] = l2s(clamp(o[1], 0, 1)); o[2] = l2s(clamp(o[2], 0, 1)); return o;
+  }
+
+  // ---- 2x2 symmetric helpers ----
+  function eig2(a, b, c) { // [[a,b],[b,c]]
+    const t = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b);
+    const l1 = t + d, l2 = t - d; let vx, vy;
+    if (Math.abs(b) > 1e-12) { vx = l1 - c; vy = b; } else if (a >= c) { vx = 1; vy = 0; } else { vx = 0; vy = 1; }
+    const n = Math.hypot(vx, vy); vx /= n; vy /= n;
+    return { l1, l2, vx, vy };
+  }
+  function symFn(m, f) { // m=[a,b,c]
+    const e = eig2(m[0], m[1], m[2]); const f1 = f(Math.max(e.l1, 1e-9)), f2 = f(Math.max(e.l2, 1e-9));
+    const ux = e.vx, uy = e.vy, wx = -uy, wy = ux;
+    return [f1 * ux * ux + f2 * wx * wx, f1 * ux * uy + f2 * wx * wy, f1 * uy * uy + f2 * wy * wy];
+  }
+  const mul = (p, q) => [p[0] * q[0] + p[1] * q[1], p[0] * q[1] + p[1] * q[2], p[1] * q[0] + p[2] * q[1], p[1] * q[1] + p[2] * q[2]]; // general 2x2 [m00,m01,m10,m11] from sym
+  function mk(Ss, Sr) { // Monge-Kantorovich linear map, returns general 2x2
+    const sh = symFn(Ss, Math.sqrt), shi = symFn(Ss, x => 1 / Math.sqrt(x));
+    const A = mul(sh, Sr); const M = [A[0] * sh[0] + A[1] * sh[1], A[0] * sh[1] + A[1] * sh[2], A[2] * sh[0] + A[3] * sh[1], A[2] * sh[1] + A[3] * sh[2]];
+    const Ms = [M[0], (M[1] + M[2]) / 2, M[3]]; const R = symFn(Ms, Math.sqrt);
+    const B = mul(shi, R); const T = [B[0] * shi[0] + B[1] * shi[1], B[0] * shi[1] + B[1] * shi[2], B[2] * shi[0] + B[3] * shi[1], B[2] * shi[1] + B[3] * shi[2]];
+    // limit extreme scaling
+    const e = eig2(T[0], (T[1] + T[2]) / 2, T[3]);
+    const lim = x => clamp(x, 0.25, 2.2);
+    if (e.l1 > 2.2 || e.l2 < 0.25) { const S = symFn([T[0], (T[1] + T[2]) / 2, T[3]], lim); return [S[0], S[1], S[1], S[2]]; }
+    return T;
+  }
+
+  const ZONES = [0.15, 0.4, 0.62, 0.85], ZS = 0.16;
+  const zoneW = L => { const w = ZONES.map(z => Math.exp(-((L - z) ** 2) / (2 * ZS * ZS))); const s = w.reduce((a, b) => a + b); return w.map(x => x / s); };
+  const NSEC = 12, SECW = 50;
+  const angd = (a, b) => { let d = (a - b) % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; };
+  const secW = h => { const w = []; let s = 0; for (let k = 0; k < NSEC; k++) { const d = Math.abs(angd(h, k * 30)); const v = d < SECW ? 0.5 + 0.5 * Math.cos(Math.PI * d / SECW) : 0; w.push(v); s += v; } return w.map(x => x / (s || 1)); };
+
+  // pixels: Float32Array of display rgb triplets
+  function labArr(px) { const n = px.length / 3, o = new Float32Array(n * 3), t = [0, 0, 0]; for (let i = 0; i < n; i++) { toLab(px[3 * i], px[3 * i + 1], px[3 * i + 2], t); o[3 * i] = t[0]; o[3 * i + 1] = t[1]; o[3 * i + 2] = t[2]; } return o; }
+
+  function lumaCurve(sL, rL) {
+    const NB = 1024, hs = new Float64Array(NB), hr = new Float64Array(NB);
+    for (const L of sL) hs[clamp(Math.floor(L * NB), 0, NB - 1)]++;
+    for (const L of rL) hr[clamp(Math.floor(L * NB), 0, NB - 1)]++;
+    const cdf = h => { const c = new Float64Array(NB); let s = 0; const T = h.reduce((a, b) => a + b); for (let i = 0; i < NB; i++) { s += h[i]; c[i] = s / T; } return c; };
+    const cs = cdf(hs), cr = cdf(hr);
+    const N = 256, curve = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const L = i / (N - 1); const q = cs[clamp(Math.floor(L * NB), 0, NB - 1)];
+      let j = 0; while (j < NB - 1 && cr[j] < q) j++;
+      curve[i] = (j + 0.5) / NB;
+    }
+    // keep endpoints sane, smooth, and enforce monotonic with slope limits
+    const sm = new Float32Array(N);
+    for (let i = 0; i < N; i++) { let s = 0, w = 0; for (let k = -8; k <= 8; k++) { const j = clamp(i + k, 0, N - 1); const ww = Math.exp(-k * k / 18); s += curve[j] * ww; w += ww; } sm[i] = s / w; }
+    for (let i = 1; i < N; i++) { const d = sm[i] - sm[i - 1]; sm[i] = sm[i - 1] + clamp(d, 0.2 / (N - 1), 3.5 / (N - 1)); }
+    return sm;
+  }
+
+  function zoneStats(lab, Lmap) {
+    const n = lab.length / 3; const st = ZONES.map(() => ({ w: 0, a: 0, b: 0, aa: 0, ab: 0, bb: 0 }));
+    for (let i = 0; i < n; i++) {
+      const L = Lmap ? Lmap(lab[3 * i]) : lab[3 * i], a = lab[3 * i + 1], b = lab[3 * i + 2]; const w = zoneW(L);
+      for (let z = 0; z < ZONES.length; z++) { const s = st[z], k = w[z]; s.w += k; s.a += k * a; s.b += k * b; s.aa += k * a * a; s.ab += k * a * b; s.bb += k * b * b; }
+    }
+    return st.map(s => { const W = s.w || 1, ma = s.a / W, mb = s.b / W; return { w: s.w / n, m: [ma, mb], S: [s.aa / W - ma * ma + 4e-5, s.ab / W - ma * mb, s.bb / W - mb * mb + 4e-5] }; });
+  }
+
+  function secStats(lab) {
+    const st = Array.from({ length: NSEC }, () => ({ w: 0, a: 0, b: 0, c: 0 })); let tot = 0;
+    const n = lab.length / 3;
+    for (let i = 0; i < n; i++) {
+      const a = lab[3 * i + 1], b = lab[3 * i + 2], c = Math.hypot(a, b); if (c < 0.02) continue; tot++;
+      const h = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360; const w = secW(h);
+      for (let k = 0; k < NSEC; k++) if (w[k]) { const s = st[k]; s.w += w[k]; s.a += w[k] * a; s.b += w[k] * b; s.c += w[k] * c; }
+    }
+    return st.map(s => ({ w: s.w / (tot || 1), h: (Math.atan2(s.b, s.a) * 180 / Math.PI + 360) % 360, c: s.w ? s.c / s.w : 0 }));
+  }
+
+  // ---- style model ----
+  function buildStyle(srcPx, refPx) {
+    const sLab = labArr(srcPx), rLab = labArr(refPx);
+    const sL = [], rL = []; for (let i = 0; i < sLab.length; i += 3) sL.push(sLab[i]); for (let i = 0; i < rLab.length; i += 3) rL.push(rLab[i]);
+    const curve = lumaCurve(sL, rL);
+    const Lmap = L => { const x = clamp(L, 0, 1) * 255, i = Math.min(254, Math.floor(x)), f = x - i; return curve[i] * (1 - f) + curve[i + 1] * f; };
+    const zs = zoneStats(sLab, Lmap), zr = zoneStats(rLab);
+    const zones = zs.map((s, z) => ({ ms: s.m, mr: zr[z].m, T: (s.w > 0.01 && zr[z].w > 0.01) ? mk(s.S, zr[z].S) : [1, 0, 0, 1], ok: s.w > 0.01 && zr[z].w > 0.01 }));
+    // fill missing zones from nearest valid
+    zones.forEach((z, i) => { if (!z.ok) { let best = null, bd = 9; zones.forEach((y, j) => { if (y.ok && Math.abs(i - j) < bd) { bd = Math.abs(i - j); best = y; } }); if (best) { z.T = best.T; z.ms = best.ms; z.mr = best.mr; } } });
+    const model = { kind: 'style', curve, zones, sec: null };
+    // stage-1 applied to source -> sector stats
+    const tmp = new Float32Array(sLab.length), o = [0, 0, 0];
+    for (let i = 0; i < sLab.length; i += 3) { stage1(model, sLab[i], sLab[i + 1], sLab[i + 2], 1, 1, o); tmp[i] = o[0]; tmp[i + 1] = o[1]; tmp[i + 2] = o[2]; }
+    const ss = secStats(tmp), sr = secStats(rLab);
+    model.sec = ss.map((s, k) => {
+      const r = sr[k]; if (s.w < 0.006 || r.w < 0.006 || s.c < 1e-4) return { dh: 0, cr: 1 };
+      return { dh: clamp(angd(r.h, s.h), -28, 28), cr: clamp(r.c / s.c, 0.45, 1.6) };
+    });
+    // simple analysis report
+    const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const chroma = lab => { let s = 0; for (let i = 0; i < lab.length; i += 3) s += Math.hypot(lab[i + 1], lab[i + 2]); return s / (lab.length / 3); };
+    model.report = { srcL: mean(sL), refL: mean(rL), srcC: chroma(sLab), refC: chroma(rLab), zones: zr.map(z => z.m), secR: sr, secS: ss };
+    return model;
+  }
+
+  function stage1(m, L, a, b, kL, kC, o) {
+    const x = clamp(L, 0, 1) * 255, i = Math.min(254, Math.floor(x)), f = x - i;
+    const Lm = m.curve[i] * (1 - f) + m.curve[i + 1] * f;
+    const L2 = L + (Lm - L) * kL;
+    const w = zoneW(L2); let na = 0, nb = 0;
+    for (let z = 0; z < m.zones.length; z++) {
+      const Z = m.zones[z], da = a - Z.ms[0], db = b - Z.ms[1];
+      na += w[z] * (Z.T[0] * da + Z.T[1] * db + Z.mr[0]); nb += w[z] * (Z.T[2] * da + Z.T[3] * db + Z.mr[1]);
+    }
+    o[0] = L2; o[1] = a + (na - a) * kC; o[2] = b + (nb - b) * kC; return o;
+  }
+
+  const SKIN = 55; // OKLab hue of skin, degrees
+  function applyStyle(m, r, g, b, p, out) {
+    const t = toLab(r, g, b, [0, 0, 0]); const L0 = t[0], a0 = t[1], b0 = t[2];
+    const o = stage1(m, L0, a0, b0, p.luma, p.color, [0, 0, 0]);
+    let L = o[0], a = o[1], bb = o[2];
+    let c = Math.hypot(a, bb); let h = (Math.atan2(bb, a) * 180 / Math.PI + 360) % 360;
+    const w = secW(h); let dh = 0, cr = 0; for (let k = 0; k < NSEC; k++) { dh += w[k] * m.sec[k].dh; cr += w[k] * m.sec[k].cr; }
+    const neutral = sstep(0.01, 0.04, c);
+    const skin = Math.max(0, 1 - Math.abs(angd(h, SKIN)) / 30) * p.skin;
+    const kk = p.color * neutral * (1 - skin);
+    h += dh * kk; c *= (1 + (cr - 1) * kk); c *= p.sat;
+    a = c * Math.cos(h * Math.PI / 180); bb = c * Math.sin(h * Math.PI / 180);
+    // overall strength mix in Lab
+    const s = p.strength;
+    return fromLab(L0 + (L - L0) * s, a0 + (a - a0) * s, b0 + (bb - b0) * s, out);
+  }
+
+  // ---- exact model (same frame graded) ----
+  const EN = 33;
+  function buildExact(srcRaw, refDisp, space, exp) {
+    const N = EN, N3 = N * N * N, acc = new Float64Array(N3 * 3), wt = new Float64Array(N3), d = [0, 0, 0];
+    const n = srcRaw.length / 3;
+    for (let i = 0; i < n; i++) {
+      const r = srcRaw[3 * i], g = srcRaw[3 * i + 1], b = srcRaw[3 * i + 2];
+      decode(r, g, b, space, exp, d);
+      const res0 = refDisp[3 * i] - d[0], res1 = refDisp[3 * i + 1] - d[1], res2 = refDisp[3 * i + 2] - d[2];
+      const x = r * (N - 1), y = g * (N - 1), z = b * (N - 1);
+      const x0 = Math.min(N - 2, Math.floor(x)), y0 = Math.min(N - 2, Math.floor(y)), z0 = Math.min(N - 2, Math.floor(z));
+      const fx = x - x0, fy = y - y0, fz = z - z0;
+      for (let k = 0; k < 8; k++) {
+        const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+        const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz); if (w < 1e-6) continue;
+        const idx = (x0 + dx) + (y0 + dy) * N + (z0 + dz) * N * N;
+        wt[idx] += w; acc[3 * idx] += w * res0; acc[3 * idx + 1] += w * res1; acc[3 * idx + 2] += w * res2;
+      }
+    }
+    let res = new Float32Array(N3 * 3); const known = new Float32Array(N3); let cover = 0;
+    for (let i = 0; i < N3; i++) { if (wt[i] > 0) { const conf = Math.min(1, wt[i] / 3); known[i] = conf; cover++; for (let c = 0; c < 3; c++) res[3 * i + c] = acc[3 * i + c] / wt[i]; } }
+    // diffusion: fill unknown + gently regularise low-confidence cells
+    const orig = res.slice(); let nxt = new Float32Array(N3 * 3);
+    for (let it = 0; it < 260; it++) {
+      for (let zz = 0; zz < N; zz++) for (let yy = 0; yy < N; yy++) for (let xx = 0; xx < N; xx++) {
+        const i = xx + yy * N + zz * N * N; let s0 = 0, s1 = 0, s2 = 0, c = 0;
+        const add = j => { s0 += res[3 * j]; s1 += res[3 * j + 1]; s2 += res[3 * j + 2]; c++; };
+        if (xx > 0) add(i - 1); if (xx < N - 1) add(i + 1); if (yy > 0) add(i - N); if (yy < N - 1) add(i + N); if (zz > 0) add(i - N * N); if (zz < N - 1) add(i + N * N);
+        const k = known[i];
+        nxt[3 * i] = k * orig[3 * i] + (1 - k) * s0 / c; nxt[3 * i + 1] = k * orig[3 * i + 1] + (1 - k) * s1 / c; nxt[3 * i + 2] = k * orig[3 * i + 2] + (1 - k) * s2 / c;
+      }
+      const t = res; res = nxt; nxt = t;
+    }
+    // light smoothing pass to kill compression noise
+    for (let it = 0; it < 2; it++) {
+      for (let i = 0; i < N3; i++) {
+        const xx = i % N, yy = Math.floor(i / N) % N, zz = Math.floor(i / (N * N)); let s = [0, 0, 0], c = 0;
+        const add = j => { s[0] += res[3 * j]; s[1] += res[3 * j + 1]; s[2] += res[3 * j + 2]; c++; };
+        if (xx > 0) add(i - 1); if (xx < N - 1) add(i + 1); if (yy > 0) add(i - N); if (yy < N - 1) add(i + N); if (zz > 0) add(i - N * N); if (zz < N - 1) add(i + N * N);
+        for (let ch = 0; ch < 3; ch++) nxt[3 * i + ch] = 0.7 * res[3 * i + ch] + 0.3 * s[ch] / c;
+      }
+      const t = res; res = nxt; nxt = t;
+    }
+    return { kind: 'exact', N, res, coverage: cover / N3 };
+  }
+  function sampleGrid(g, N, r, gg, b, out) {
+    const x = clamp(r, 0, 1) * (N - 1), y = clamp(gg, 0, 1) * (N - 1), z = clamp(b, 0, 1) * (N - 1);
+    const x0 = Math.min(N - 2, Math.floor(x)), y0 = Math.min(N - 2, Math.floor(y)), z0 = Math.min(N - 2, Math.floor(z));
+    const fx = x - x0, fy = y - y0, fz = z - z0; out[0] = out[1] = out[2] = 0;
+    for (let k = 0; k < 8; k++) {
+      const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+      const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+      const j = 3 * ((x0 + dx) + (y0 + dy) * N + (z0 + dz) * N * N);
+      out[0] += w * g[j]; out[1] += w * g[j + 1]; out[2] += w * g[j + 2];
+    }
+    return out;
+  }
+
+  // full transform raw input -> output display
+  function transform(model, space, exp, p) {
+    const d = [0, 0, 0], q = [0, 0, 0];
+    if (model.kind === 'style') return (r, g, b, out) => { decode(r, g, b, space, exp, d); return applyStyle(model, d[0], d[1], d[2], p, out); };
+    return (r, g, b, out) => {
+      decode(r, g, b, space, exp, d); sampleGrid(model.res, model.N, r, g, b, q);
+      const s = p.strength; out[0] = clamp(d[0] + q[0] * s, 0, 1); out[1] = clamp(d[1] + q[1] * s, 0, 1); out[2] = clamp(d[2] + q[2] * s, 0, 1); return out;
+    };
+  }
+
+  function makeLUT(N, fn) {
+    const lut = new Float32Array(N * N * N * 3), o = [0, 0, 0]; let i = 0;
+    for (let b = 0; b < N; b++) for (let g = 0; g < N; g++) for (let r = 0; r < N; r++) { fn(r / (N - 1), g / (N - 1), b / (N - 1), o); lut[i++] = o[0]; lut[i++] = o[1]; lut[i++] = o[2]; }
+    return lut;
+  }
+  function applyLUT(lut, N, src, dst) { // src/dst Uint8ClampedArray RGBA
+    const o = [0, 0, 0];
+    for (let i = 0; i < src.length; i += 4) { sampleGrid(lut, N, src[i] / 255, src[i + 1] / 255, src[i + 2] / 255, o); dst[i] = o[0] * 255 + 0.5; dst[i + 1] = o[1] * 255 + 0.5; dst[i + 2] = o[2] * 255 + 0.5; dst[i + 3] = 255; }
+  }
+  function cubeText(lut, N, title, note) {
+    const lines = [`TITLE "${title}"`, `# ${note}`, `# Made with LUT Generator`, `LUT_3D_SIZE ${N}`, 'DOMAIN_MIN 0.0 0.0 0.0', 'DOMAIN_MAX 1.0 1.0 1.0'];
+    for (let i = 0; i < lut.length; i += 3) lines.push(lut[i].toFixed(6) + ' ' + lut[i + 1].toFixed(6) + ' ' + lut[i + 2].toFixed(6));
+    return lines.join('\n') + '\n';
+  }
+
+  // ---- minimal store-only zip ----
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) { // [{name, data:Uint8Array}]
+    const parts = [], central = []; let off = 0;
+    for (const f of files) {
+      const nm = new TextEncoder().encode(f.name), crc = crc32(f.data), sz = f.data.length;
+      const h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true); h.setUint32(18, sz, true); h.setUint32(22, sz, true); h.setUint16(26, nm.length, true);
+      parts.push(new Uint8Array(h.buffer), nm, f.data);
+      const c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true); c.setUint32(20, sz, true); c.setUint32(24, sz, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), nm); off += 30 + nm.length + sz;
+    }
+    const cs = central.reduce((a, b) => a + b.length, 0);
+    const e = new DataView(new ArrayBuffer(22)); e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
+    return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: 'application/zip' });
+  }
+
+  return { decode, buildStyle, buildExact, transform, makeLUT, applyLUT, cubeText, zip, sampleGrid, toLab, fromLab };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+
+{
+const $ = id => document.getElementById(id);
+const st = { mode: 'style', src: null, refs: [], model: null, lut: null, view: 'split', splitX: 0.5, busy: false };
+const SL = [
+  ['strength', 'Overall strength', 0, 1.5, 0.01, 1],
+  ['luma', 'Brightness / contrast match', 0, 1, 0.01, 1],
+  ['color', 'Colour match', 0, 1, 0.01, 1],
+  ['sat', 'Saturation trim', 0.5, 1.5, 0.01, 1],
+  ['skin', 'Skin tone protect', 0, 1, 0.01, 0.5],
+];
+const P = {};
+let saved = {}; try { saved = JSON.parse(localStorage.getItem('lutgen') || '{}'); } catch (e) {}
+$('sliders').innerHTML = SL.map(([k, l, a, b, s]) => `<label for="s_${k}">${l}</label><div class="row"><input type="range" id="s_${k}" min="${a}" max="${b}" step="${s}"><span class="val" id="v_${k}"></span></div>`).join('');
+SL.forEach(([k, , , , , d]) => { P[k] = typeof saved[k] === 'number' ? saved[k] : d; const el = $('s_' + k); el.value = P[k]; $('v_' + k).textContent = (+P[k]).toFixed(2);
+  el.addEventListener('input', () => { P[k] = +el.value; $('v_' + k).textContent = P[k].toFixed(2); persist(); schedule(false); }); });
+function persist() { try { localStorage.setItem('lutgen', JSON.stringify({ ...P, space: $('space').value, exp: +$('exp').value })); } catch (e) {} }
+if (saved.space) $('space').value = saved.space; if (typeof saved.exp === 'number') $('exp').value = saved.exp;
+
+const HINTS = {
+  style: 'Footage frame ekata, references wala tone eka (brightness, contrast, colour, greens/skin) analyse karala LUT ekak hadanawa. Reference photos godak dunnoth result eka stable wenawa.',
+  exact: 'Ekama frame eke ungraded version ekai graded version ekai dunnoth pixel-by-pixel match karala, eke tone ekama dena LUT ekak hadanawa. Me thamai wadima accurate mode eka.',
+  pg: 'PowerGrade eka apply karapu still eka dunnoth, eka target tone ekata harawana correction LUT ekak hadanawa. Eka PowerGrade eke last node ekata danna.'
+};
+function setMode(m) {
+  st.mode = m; document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $('modeHint').textContent = HINTS[m];
+  $('spaceBox').hidden = m === 'pg'; $('pgExactBox').hidden = m !== 'pg';
+  $('srcTitle').textContent = m === 'pg' ? 'PowerGrade apply karapu still' : m === 'exact' ? 'Ungraded frame' : 'Footage frame';
+  $('refTitle').textContent = m === 'style' || (m === 'pg' && !$('pgExact').checked) ? 'Reference grade photos' : 'Graded version (same frame)';
+  $('refFile').multiple = algo() === 'style';
+  $('refDropT').textContent = algo() === 'style' ? 'Photos thoranna (kihipayak denna puluwan)' : 'Graded frame eka thoranna';
+  if (algo() === 'exact' && st.refs.length > 1) { st.refs = st.refs.slice(-1); drawThumbs(); }
+  schedule(true);
+}
+const algo = () => st.mode === 'exact' || (st.mode === 'pg' && $('pgExact').checked) ? 'exact' : 'style';
+const space = () => st.mode === 'pg' ? 'rec709' : $('space').value;
+const exp = () => space() === 'rec709' ? 0 : +$('exp').value;
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('pgExact').addEventListener('change', () => setMode('pg'));
+$('space').addEventListener('change', () => { $('expBox').hidden = $('space').value === 'rec709'; persist(); schedule(true); });
+$('exp').addEventListener('input', () => { $('expV').textContent = (+$('exp').value).toFixed(1); persist(); schedule(true); });
+$('expBox').hidden = $('space').value === 'rec709'; $('expV').textContent = (+$('exp').value).toFixed(1);
+
+// ---- image loading ----
+function loadImg(file) {
+  return new Promise((res, rej) => { const u = URL.createObjectURL(file); const im = new Image(); im.onload = () => res({ im, url: u, name: file.name }); im.onerror = () => rej(new Error('Me image eka open karanna bari una (TIFF browser eke open wenne na — PNG/JPG use karanna)')); im.src = u; });
+}
+function pixels(im, maxSide, w, h) {
+  if (!w) { const k = Math.min(1, maxSide / Math.max(im.naturalWidth, im.naturalHeight)); w = Math.max(1, Math.round(im.naturalWidth * k)); h = Math.max(1, Math.round(im.naturalHeight * k)); }
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
+  return { data: x.getImageData(0, 0, w, h).data, w, h };
+}
+const toF = d => { const o = new Float32Array(d.length / 4 * 3); for (let i = 0, j = 0; i < d.length; i += 4) { o[j++] = d[i] / 255; o[j++] = d[i + 1] / 255; o[j++] = d[i + 2] / 255; } return o; };
+function drawThumbs() {
+  $('srcThumb').innerHTML = st.src ? `<div><img alt="" src="${st.src.url}"><button data-x="src" aria-label="Remove">×</button></div>` : '';
+  $('refThumbs').innerHTML = st.refs.map((r, i) => `<div><img alt="" src="${r.url}"><button data-x="${i}" aria-label="Remove">×</button></div>`).join('');
+}
+document.addEventListener('click', e => { const x = e.target.dataset && e.target.dataset.x; if (x == null) return;
+  if (x === 'src') st.src = null; else st.refs.splice(+x, 1); drawThumbs(); schedule(true); });
+async function addSrc(files) { if (!files[0]) return; try { st.src = await loadImg(files[0]); drawThumbs(); schedule(true); } catch (e) { msg(e.message); } }
+async function addRefs(files) { try { const l = await Promise.all([...files].map(loadImg)); st.refs = algo() === 'exact' ? l.slice(-1) : st.refs.concat(l); drawThumbs(); schedule(true); } catch (e) { msg(e.message); } }
+$('srcFile').addEventListener('change', e => { addSrc(e.target.files); e.target.value = ''; });
+$('refFile').addEventListener('change', e => { addRefs(e.target.files); e.target.value = ''; });
+[['srcDrop', addSrc], ['refDrop', addRefs]].forEach(([id, fn]) => { const d = $(id);
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); fn(e.dataTransfer.files); }); });
+const msg = t => { $('status').textContent = t; };
+
+// ---- analysis + render ----
+let timer = null, needModel = true;
+function schedule(model) { needModel = needModel || model; clearTimeout(timer); timer = setTimeout(run, model ? 30 : 60); }
+let preview = null;
+function run() {
+  const ready = st.src && st.refs.length;
+  $('dl').disabled = $('copy').disabled = !ready;
+  if (!st.src) { $('empty').hidden = false; ['cv', 'split', 'tagL', 'tagR'].forEach(i => $(i).hidden = true); $('stats').innerHTML = ''; $('curve').innerHTML = ''; msg(''); return; }
+  if (!preview || preview.im !== st.src.im) { const p = pixels(st.src.im, 1400); preview = { im: st.src.im, ...p, out: new ImageData(p.w, p.h) }; }
+  if (!ready) { st.model = null; st.lut = null; paint(); msg('Reference photo ekak danna.'); return; }
+  try {
+    if (needModel) {
+      msg('Analyse karanawa…');
+      if (algo() === 'exact') {
+        const s = pixels(st.src.im, 700); const ra = st.refs[0].im.naturalWidth / st.refs[0].im.naturalHeight, sa = s.w / s.h;
+        const r = pixels(st.refs[0].im, 0, s.w, s.h);
+        st.model = Core.buildExact(toF(s.data), toF(r.data), space(), exp());
+        st.warn = Math.abs(ra - sa) / sa > 0.02 ? 'Images dekeh size/crop eka samana na — same frame eka, ekama crop ekata export karanna.' : '';
+      } else {
+        const s = toF(pixels(st.src.im, 360).data), d = [0, 0, 0];
+        for (let i = 0; i < s.length; i += 3) { Core.decode(s[i], s[i + 1], s[i + 2], space(), exp(), d); s[i] = d[0]; s[i + 1] = d[1]; s[i + 2] = d[2]; }
+        const refs = st.refs.map(r => toF(pixels(r.im, 360).data)); const all = new Float32Array(refs.reduce((a, b) => a + b.length, 0)); let o = 0; refs.forEach(r => { all.set(r, o); o += r.length; });
+        st.model = Core.buildStyle(s, all); st.warn = '';
+      }
+      needModel = false;
+    }
+    st.lut = Core.makeLUT(33, Core.transform(st.model, space(), exp(), P));
+    Core.applyLUT(st.lut, 33, preview.data, preview.out.data);
+    paint(); stats(); curve();
+    msg(st.warn || (algo() === 'exact' ? `Match una. Colour coverage ${(st.model.coverage * 100).toFixed(1)}% — frame eke nathi colours walata smooth fill ekak dala thiyenawa.` : `${st.refs.length} reference photo(s) walin analyse kala.`));
+  } catch (e) { console.error(e); msg('Error: ' + e.message); }
+}
+function paint() {
+  const cv = $('cv'); $('empty').hidden = true; cv.hidden = false; cv.width = preview.w; cv.height = preview.h;
+  const x = cv.getContext('2d'); const before = new ImageData(new Uint8ClampedArray(preview.data), preview.w, preview.h);
+  // "before" for log shows the flat log image, as Resolve would
+  const has = !!st.lut; const v = has ? st.view : 'before';
+  if (v === 'before') x.putImageData(before, 0, 0); else if (v === 'after') x.putImageData(preview.out, 0, 0);
+  else { x.putImageData(preview.out, 0, 0); const sx = Math.round(preview.w * st.splitX); x.putImageData(before, 0, 0, 0, 0, sx, preview.h); }
+  const sp = v === 'split'; $('split').hidden = !sp; $('tagL').hidden = !(sp || v === 'before'); $('tagR').hidden = !(sp || v === 'after');
+  if (sp) { const r = cv.getBoundingClientRect(), vr = $('viewer').getBoundingClientRect(); $('split').style.left = (r.left - vr.left + r.width * st.splitX - 1) + 'px'; }
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.view; document.querySelectorAll('.seg button').forEach(y => y.setAttribute('aria-pressed', y === b)); if (preview) paint(); }));
+let drag = false; const setSplit = e => { const r = $('cv').getBoundingClientRect(); st.splitX = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); paint(); };
+$('viewer').addEventListener('pointerdown', e => { if (st.view !== 'split' || !st.lut) return; drag = true; $('viewer').setPointerCapture(e.pointerId); setSplit(e); });
+$('viewer').addEventListener('pointermove', e => drag && setSplit(e));
+$('viewer').addEventListener('pointerup', () => drag = false);
+const ro = new ResizeObserver(() => preview && st.lut && paint()); ro.observe($('viewer'));
+
+function lumStats(d) { let L = 0, C = 0, n = 0; const t = [0, 0, 0]; for (let i = 0; i < d.length; i += 16) { Core.toLab(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, t); L += t[0]; C += Math.hypot(t[1], t[2]); n++; } return { L: L / n, C: C / n }; }
+function stats() {
+  const b = lumStats(preview.data), a = lumStats(preview.out.data);
+  let ref = '';
+  if (st.model.report) { const r = st.model.report; ref = `<div class="stat"><span>Reference brightness / colourfulness</span><b>${(r.refL * 100).toFixed(0)}</b><i>/ ${(r.refC * 1000).toFixed(0)}</i></div>`; }
+  $('stats').innerHTML = `<div class="stat"><span>Before brightness</span><b>${(b.L * 100).toFixed(0)}</b></div><div class="stat"><span>After brightness</span><b>${(a.L * 100).toFixed(0)}</b></div><div class="stat"><span>Colourfulness before → after</span><b>${(b.C * 1000).toFixed(0)}</b><i>→ ${(a.C * 1000).toFixed(0)}</i></div>` + ref;
+}
+function curve() {
+  const s = $('curve'), W = s.clientWidth, H = s.clientHeight; if (!W) return; const o = [0, 0, 0], N = 48, pts = [[], [], []];
+  const fn = Core.transform(st.model, space(), exp(), P);
+  for (let i = 0; i <= N; i++) { const v = i / N; fn(v, v, v, o); for (let c = 0; c < 3; c++) pts[c].push(`${(v * W).toFixed(1)},${((1 - o[c]) * H).toFixed(1)}`); }
+  const col = ['#e0533d', '#4caf6a', '#4a7fe0'];
+  s.innerHTML = `<line x1="0" y1="${H}" x2="${W}" y2="0" stroke="currentColor" opacity=".18"/>` + pts.map((p, c) => `<polyline fill="none" stroke="${col[c]}" stroke-width="1.6" points="${p.join(' ')}"/>`).join('');
+}
+
+// ---- export ----
+function cube() {
+  const N = +$('lsize').value; const lut = N === 33 ? st.lut : Core.makeLUT(N, Core.transform(st.model, space(), exp(), P));
+  const sp = { rec709: 'Rec.709', slog3: 'Sony S-Log3 / S-Gamut3.Cine', cineon: 'Rec.709 gamut / Cineon Film Log' }[space()];
+  const name = ($('lname').value.trim() || 'My_Grade_LUT').replace(/[^\w\- ]+/g, '_');
+  return { name, text: Core.cubeText(lut, N, name, `Input: ${sp}${exp() ? ` (exposure ${exp() > 0 ? '+' : ''}${exp()} stops)` : ''} -> Output: Rec.709`) };
+}
+let downloads = null;
+$('dl').addEventListener('click', async () => {
+  if (!st.lut) return; const { name, text } = cube();
+  const blob = Core.zip([{ name: name + '.cube', data: new TextEncoder().encode(text) }]);
+  if (window.lutApp) { // desktop app: save dialog (opens in Resolve LUT folder)
+    try { const r = await window.lutApp.saveCube(name + '.cube', text); $('dlMsg').textContent = r ? 'Save una: ' + r + ' — Resolve eke LUT list eka refresh karanna.' : 'Save eka cancel una.'; }
+    catch (e) { $('dlMsg').textContent = 'Save karanna bari una: ' + e.message; } return; }
+  if (!downloads) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name + '.cube'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); $('dlMsg').textContent = 'Download una.'; return; }
+  try { await downloads.save({ filename: name + '.zip', data: blob }); $('dlMsg').textContent = 'Save una. Zip eka extract karala .cube eka Resolve LUT folder ekata danna.'; }
+  catch (e) { $('dlMsg').textContent = e && e.code === 'declined' ? 'Download eka cancel una.' : 'Download eka bari una (' + (e && e.code || 'error') + '). Copy button eka try karanna.'; }
+});
+$('copy').addEventListener('click', async () => {
+  if (!st.lut) return; const { text } = cube();
+  try { await navigator.clipboard.writeText(text); $('dlMsg').textContent = 'Copy una. Notepad eke paste karala "name.cube" widihata save karanna (Save as type: All files).'; }
+  catch (e) { $('dlMsg').textContent = 'Copy karanna bari una.'; }
+});
+
+setMode('style');
+if (window.lutApp) { $('dl').textContent = 'Save .cube'; $('dlMsg').textContent = 'Save button eken kelinma Resolve LUT folder ekata save karanna puluwan.'; window.lutApp.version().then(v => { const s = document.createElement('span'); s.className = 'hint'; s.textContent = 'v' + v; document.querySelector('header').appendChild(s); }).catch(() => {}); }
+(async () => {
+  if (!window.claude || !claude.use) return;
+  try { downloads = await claude.use('downloads'); } catch (e) {}
+  try { const d = await claude.use('desktop'); if (d && d.install && await d.install.state() === 'available') { const b = $('install'); b.hidden = false; b.addEventListener('click', () => d.install.request().catch(() => {})); } } catch (e) {}
+})();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "name": "lut-generator",
+  "productName": "LUT Generator",
+  "version": "1.0.0",
+  "description": "Analyse a footage frame and reference grades, export a .cube LUT",
+  "author": "eapasindu-sudo",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.eapasindu.lutgenerator",
+    "productName": "LUT Generator",
+    "files": ["main.js", "preload.js", "app/**/*", "build/icon.png"],
+    "directories": { "output": "dist" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "LUT-Generator-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LUT Generator"
+    },
+    "publish": [{ "provider": "github", "owner": "eapasindu-sudo", "repo": "lut-generator", "releaseType": "release" }]
+  }
+}
