@@ -16,8 +16,8 @@ App eka open weddi aluth version ekak thiyenawada kiyala check karanawa. Thiyena
 ## Aluth version ekak release karana widiha
 
 1. `package.json` eke `version` eka wadi karanna (e.g. `1.0.1`).
-2. Commit karala tag ekak push karanna: `git tag v1.0.1 && git push origin main --tags`
-3. GitHub Actions eken installer eka build karala Release ekata danawa. Install karala thiyena apps auto update wenawa.
+2. Commit karala `main` ekata push karanna.
+3. GitHub Actions eken installer eka build karala `v1.0.1` Release eka hadanawa. Install karala thiyena apps auto update wenawa.
 
 ## Build locally
 

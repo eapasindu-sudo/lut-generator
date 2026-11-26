@@ -1,8 +1,11 @@
 name: Build Windows installer
 
+# Every push to main builds the installer and publishes it as the GitHub Release
+# for the version in package.json (tag v<version> is created automatically).
+# Bump "version" in package.json to ship an update; installed apps auto-update from it.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,17 +24,10 @@ jobs:
       - name: Install
         run: npm install
 
-      # Tag push (v1.0.1 ...) -> publish a GitHub Release that the app auto-updates from
       - name: Build & publish release
-        if: startsWith(github.ref, 'refs/tags/v')
         run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Manual run -> just build, download from the Actions run page
-      - name: Build only
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: npx electron-builder --win --publish never
 
       - uses: actions/upload-artifact@v4
         with:
